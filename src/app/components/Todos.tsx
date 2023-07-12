@@ -3,26 +3,20 @@
 import React, { type FC } from 'react'
 import { useMachine } from '@xstate/react'
 
-import { todoMachine } from '../../todo-machine'
+import { type Todo, todoMachine } from '../../todo-machine'
 
-const todos = [
-  { id: 1, title: 'Todo 1', completed: false },
-  { id: 2, title: 'Todo 2', completed: false },
-  { id: 3, title: 'Todo 3', completed: false },
-];
+const todos = [] as Todo[];
 
-let lastId = 3;
+let lastId = 0;
 
 export const Todos: FC = () => {
-  const [state, send] = useMachine(todoMachine, {
+  const [state, send, assign] = useMachine(todoMachine, {
     // You can override the services in each state.
     // This is useful for mocking out API calls
     // or for calling services with different parameters.
     services: {
-      fetchTodos: async () => {
-        // throw new Error("boom");
-        return Array.from(todos);
-      },
+      fetchTodos: async () => todos,
+
       saveTodo: async (context) => {
         if (!context.createTodo) {
           throw new Error('Cannot save without a todo');
@@ -35,12 +29,23 @@ export const Todos: FC = () => {
 
         todos.push(newTodo);
       },
+
       deleteTodo: async (context, event) => {
-        throw new Error("couldn't delete " + event.id);
+        // throw new Error("couldn't delete " + event.id);
         const index = todos.findIndex((todo) => todo.id === event.id);
 
         todos.splice(index, 1);
-      }
+      },
+
+      toggleTodo: async (context, event) => {
+        const todo = todos.find((todo) => todo.id === event.id);
+
+        if (!todo) {
+          throw new Error('Todo not found');
+        }
+
+        todo.completed = !todo.completed;
+      },
     },
   });
 
@@ -65,6 +70,7 @@ export const Todos: FC = () => {
                 <input
                   type="checkbox"
                   checked={todo.completed}
+                  onChange={() => send({ type: 'TODO_TOGGLED', id: todo.id })}
                 />
                 <span>{todo.title}</span>
                 <button onClick={() => send({ type: 'TODO_DELETED', id: todo.id })}>Delete</button>
@@ -78,7 +84,10 @@ export const Todos: FC = () => {
 
       {state.matches('todoCreate') && (
         <form onSubmit={(e) => (e.preventDefault(), send('FORM_SUBMITTED'))}>
-          <input onChange={(e) => send({ type: 'FORM_CHANGED', value: e.target.value })} />
+          <input
+            autoFocus
+            onChange={(e) => send({ type: 'FORM_CHANGED', value: e.target.value })}
+          />
         </form>
       )}
     </div>
